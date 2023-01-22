@@ -1,0 +1,8 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+	"name": "docker from docker - runner",
+	"image": "mcr.microsoft.com/devcontainers/universal:linux",
+	"mounts": [
+		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+	]
+}
