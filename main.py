@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from handler import MessageHandler
 
 app = Flask(__name__)
@@ -45,6 +45,14 @@ def commands():
     result,message = handler.handle(user, command)
 
     return jsonify({'code': result, 'message': message}), 200
+
+@app.route('/common/setpassword')
+def setpassword():
+    return send_file('setpassword.html')
+
+@app.route('/public_key.asc')
+def public_key():
+    return send_file('data/public_key.asc')
 
 
 if __name__ == '__main__':

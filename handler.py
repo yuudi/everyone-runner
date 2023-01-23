@@ -2,21 +2,18 @@ import io
 import queue
 import random
 import string
+import subprocess
 import tarfile
 import time
 from threading import Thread
 
-import docker
 from docker.models.containers import Container, ExecResult
-
+from password import Passwords
+import docker
 from language_map import language_map
 from scheduler import Scheduler
 
-BASE_IMAGE = 'everyone-runner:universal'
-RTAIL_SERVER = "172.17.0.2"
-RTAIL_PORT = "9999"
-RTAIL_WEBBASE = "http://localhost:8888"
-TTYD_WEBBASE = "http://{user}.terminal.localhost"
+from config import *
 
 
 class MessageHandler:
@@ -27,6 +24,7 @@ class MessageHandler:
         except docker.errors.NotFound:
             self.docker_client.networks.create('everyone-runner')
 
+        self.passwords = Passwords()    
         self.scheduler = Scheduler()  # TODO: shutdown idle containers
 
     def create_user_container(self, user: str) -> Container:
@@ -122,16 +120,38 @@ class MessageHandler:
             return 0, output
 
     def run_ttyd(self, user: str) -> tuple[int, str]:
+        password = self.passwords.get(user)
+        if password is None:
+            return 1, '请先设置密码' + self.ttyd_url_from_name('setpassword')
+        user_colon_password = f'{user}:{password}'
         container = self.get_running_user_container(user)
         container.exec_run(
             cmd=[
-                'ttyd', 'bash'
+                'ttyd', '-c', user_colon_password, 'bash'
             ],
             workdir='/workspace',
             user='1000',
             detach=True,
         )
         return 0, '请在网站中继续' + self.ttyd_url_from_name(user)
+    
+    def run_set_password(self, user: str, gpg_message: str) -> tuple[int, str]:
+        process = subprocess.run(
+            ['gpg', '--decrypt'],
+            input=gpg_message.encode(),
+            capture_output=True,
+        )
+        if process.returncode != 0:
+            return 1, 'gpg decrypt failed'
+        plaintext = process.stdout.decode().strip()
+        args = plaintext.split(':',maxsplit=1)
+        if len(args) != 2:
+            return 1, 'gpg message not match'
+        if args[0] != user:
+            return 1, 'gpg message not match'
+        password = args[1]
+        self.passwords.set(user, password)
+
 
     def handle(self, user: str, user_input: str) -> tuple[int, str]:
         if not user_input.startswith('run '):
@@ -144,6 +164,8 @@ class MessageHandler:
                 return 1, 'script needed'
         if len(args) != 3:
             return 1, 'command not match'
+        if args[1] == 'auth':
+            return self.run_set_password(user, args[2])
         return self.run_language(user, args[1], args[2])
 
 

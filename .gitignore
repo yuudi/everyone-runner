@@ -25,3 +25,6 @@ __pypackages__/
 # IDEs
 .vscode/
 .idea/
+
+# runtime
+data/
