@@ -120,9 +120,10 @@ class MessageHandler:
             return 0, output
 
     def run_ttyd(self, user: str) -> tuple[int, str]:
-        password = self.passwords.get(user)
-        if password is None:
+        userinfo = self.passwords.get(user)
+        if userinfo is None:
             return 1, '请先设置密码' + self.ttyd_url_from_name('setpassword')
+        password = userinfo['password']
         user_colon_password = f'{user}:{password}'
         container = self.get_running_user_container(user)
         container.exec_run(
