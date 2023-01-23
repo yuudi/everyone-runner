@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from handler import MessageHandler
 
 app = Flask(__name__)
@@ -14,6 +14,10 @@ handler = MessageHandler()
 @app.route('/')
 def no_homepage():
     return '404: Not Found', 404
+
+@app.route('/assets/<path:path>')
+def assets(path):
+    return send_from_directory('assets', path)
 
 
 @app.route('/api/v1/commands', methods=['POST'])
