@@ -136,10 +136,15 @@ class MessageHandler:
     def handle(self, user: str, user_input: str) -> tuple[int, str]:
         if not user_input.startswith('run '):
             return 1, 'command not match'
-        _, language, code = user_input.split(maxsplit=2)
-        if language == 'ttyd':
-            return self.run_ttyd(user)
-        return self.run_language(user, language, code)
+        args = user_input.split(maxsplit=2)
+        if len(args) == 2:
+            if args[1] == 'ttyd':
+                return self.run_ttyd(user)
+            else:
+                return 1, 'script needed'
+        if len(args) != 3:
+            return 1, 'command not match'
+        return self.run_language(user, args[1], args[2])
 
 
 def random_string(length: int) -> str:
