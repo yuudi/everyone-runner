@@ -24,7 +24,7 @@ class MessageHandler:
         except docker.errors.NotFound:
             self.docker_client.networks.create('everyone-runner')
 
-        self.passwords = Passwords()    
+        self.passwords = Passwords()
         self.scheduler = Scheduler()  # TODO: shutdown idle containers
 
     def create_user_container(self, user: str) -> Container:
@@ -99,7 +99,9 @@ class MessageHandler:
 
         exec_args = {
             "cmd": [
-                'bash', '-c', f'({run_command}) | rtail -h "{RTAIL_SERVER}" -p "{RTAIL_PORT}" --name "{datetime_str}-{run_id}-{user}" ; rm -f {filename}'
+                'timeout', '300',
+                'bash', '-c',
+                f'({run_command}) | rtail -h "{RTAIL_SERVER}" -p "{RTAIL_PORT}" --name "{datetime_str}-{run_id}-{user}" ; rm -f {filename}',
             ],
             "workdir": '/workspace',
             "user": '1000',
@@ -135,7 +137,7 @@ class MessageHandler:
             detach=True,
         )
         return 0, '请在网站中继续' + self.ttyd_url_from_name(user)
-    
+
     def run_set_password(self, user: str, gpg_message: str) -> tuple[int, str]:
         process = subprocess.run(
             ['gpg', '--decrypt'],
@@ -145,14 +147,13 @@ class MessageHandler:
         if process.returncode != 0:
             return 1, 'gpg decrypt failed'
         plaintext = process.stdout.decode().strip()
-        args = plaintext.split(':',maxsplit=1)
+        args = plaintext.split(':', maxsplit=1)
         if len(args) != 2:
             return 1, 'gpg message not match'
         if args[0] != user:
             return 1, 'gpg message not match'
         password = args[1]
         self.passwords.set(user, password)
-
 
     def handle(self, user: str, user_input: str) -> tuple[int, str]:
         if not user_input.startswith('run '):
