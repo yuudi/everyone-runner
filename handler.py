@@ -11,7 +11,7 @@ from docker.models.containers import Container, ExecResult
 from password import Passwords
 import docker
 from language_map import language_map
-from scheduler import Scheduler
+from scheduler import ShutdownManager
 
 from config import *
 
@@ -24,8 +24,12 @@ class MessageHandler:
         except docker.errors.NotFound:
             self.docker_client.networks.create('everyone-runner')
 
+        self.tty_running_users = set()
         self.passwords = Passwords()
-        self.scheduler = Scheduler()  # TODO: shutdown idle containers
+        self.shutdown_jm = ShutdownManager(
+            shutdown_func=self.shutdown_user_container,
+            inactive_timelimit=INACTIVE_TIMELIMIT,
+        )
 
     def create_user_container(self, user: str) -> Container:
         container = self.docker_client.containers.run(
@@ -44,6 +48,17 @@ class MessageHandler:
             },
         )
         return container
+
+    def shutdown_user_container(self, user: str):
+        try:
+            container = self.docker_client.containers.get(
+                f'everyone-runner-{user}'
+            )
+        except docker.errors.NotFound:
+            pass
+        else:
+            container.stop()
+        self.tty_running_users.discard(user)
 
     def get_running_user_container(self, user: str) -> Container:
         try:
@@ -86,6 +101,7 @@ class MessageHandler:
         if command is None:
             return 10005, f'Language {language} not supported'
         container = self.get_running_user_container(user)
+        self.shutdown_jm.extend_shutdown_job(user)
         run_id = random_string(6)
         filename_noext = f'.code-{user}-{run_id}'
         filename = f'{filename_noext}.{language}'
@@ -124,10 +140,13 @@ class MessageHandler:
     def run_ttyd(self, user: str) -> tuple[int, str]:
         userinfo = self.passwords.get(user)
         if userinfo is None:
-            return 1, '请先设置密码' + self.ttyd_url_from_name('setpassword')
+            return 0, '请先设置密码' + self.ttyd_url_from_name('setpassword')
+        container = self.get_running_user_container(user)
+        self.shutdown_jm.extend_shutdown_job(user)
+        if user in self.tty_running_users:
+            return 0, '请在网站中继续' + self.ttyd_url_from_name(user)
         password = userinfo['password']
         user_colon_password = f'{user}:{password}'
-        container = self.get_running_user_container(user)
         container.exec_run(
             cmd=[
                 'ttyd', '-c', user_colon_password, 'bash'
@@ -136,6 +155,7 @@ class MessageHandler:
             user='1000',
             detach=True,
         )
+        self.tty_running_users.add(user)
         return 0, '请在网站中继续' + self.ttyd_url_from_name(user)
 
     def run_set_password(self, user: str, gpg_message: str) -> tuple[int, str]:
@@ -145,13 +165,13 @@ class MessageHandler:
             capture_output=True,
         )
         if process.returncode != 0:
-            return 1, 'gpg decrypt failed'
+            return 0, 'gpg decrypt failed'
         plaintext = process.stdout.decode().strip()
         args = plaintext.split(':', maxsplit=1)
         if len(args) != 2:
-            return 1, 'gpg message not match'
+            return 0, 'gpg message not match'
         if args[0] != user:
-            return 1, 'gpg message not match'
+            return 0, 'gpg message not match'
         password = args[1]
         self.passwords.set(user, password)
 
@@ -163,9 +183,9 @@ class MessageHandler:
             if args[1] == 'ttyd':
                 return self.run_ttyd(user)
             else:
-                return 1, 'script needed'
+                return 0, 'script needed'
         if len(args) != 3:
-            return 1, 'command not match'
+            return 0, 'command not match'
         if args[1] == 'auth':
             return self.run_set_password(user, args[2])
         return self.run_language(user, args[1], args[2])
