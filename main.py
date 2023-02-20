@@ -1,11 +1,12 @@
-from flask import Flask, jsonify, request, send_from_directory, send_file
+from flask import Flask, jsonify, request, send_file, send_from_directory
+
 from handler import MessageHandler
+from viewer import (VIER_STATUS_FINISHED, VIER_STATUS_NOT_FOUND,
+                    VIER_STATUS_RUNNING, viewer)
 
 app = Flask(__name__)
 
-_secret = ''
-with open('secret.txt', 'r') as f:
-    _secret = f.read().strip()
+from config import API_SECRET
 
 
 handler = MessageHandler()
@@ -15,6 +16,7 @@ handler = MessageHandler()
 def no_homepage():
     return '404: Not Found', 404
 
+
 @app.route('/assets/<path:path>')
 def assets(path):
     return send_from_directory('assets', path)
@@ -23,7 +25,7 @@ def assets(path):
 @app.route('/api/v1/commands', methods=['POST'])
 def commands():
     auth = request.headers.get('Authorization')
-    if auth != f'Bearer {_secret}':
+    if auth != f'Bearer {API_SECRET}':
         return jsonify({'code': 10000, 'error': 'Invalid Authorization'}), 401
 
     if request.content_type != 'application/json':
@@ -42,17 +44,39 @@ def commands():
     if not user.isalnum():
         return jsonify({'code': 10004, 'error': 'Invalid username'}), 400
 
-    result,message = handler.handle(user, command)
+    result, message = handler.handle(user, command)
 
     return jsonify({'code': result, 'message': message}), 200
 
-@app.route('/common/setpassword')
+
+@app.route('/ttyd/setpassword')
 def setpassword():
     return send_file('setpassword.html')
+
 
 @app.route('/public_key.asc')
 def public_key():
     return send_file('data/public_key.asc')
+
+
+@app.route('/api/v1/logs/<log_id>')
+def logs(log_id):
+    offset_str = request.args.get('offset', 0)
+    if not offset_str.isnumeric():
+        return jsonify({'code': 10006, 'error': 'Invalid offset'}), 400
+    offset = int(offset_str)
+    status, v = viewer.get_log_viewer(log_id, offset)
+    if status == VIER_STATUS_NOT_FOUND:
+        return jsonify({'code': 10005, 'error': 'Log not found'}), 404
+    if status == VIER_STATUS_FINISHED:
+        return jsonify({'code': 0, 'finished': True, 'logs': v}), 200
+    if status == VIER_STATUS_RUNNING:
+        return jsonify({'code': 0, 'finished': False, 'logs': v}), 200
+
+
+@app.route('/log/<log_id>')
+def log(log_id):
+    return send_file('view-log.html')
 
 
 if __name__ == '__main__':

@@ -7,13 +7,14 @@ import tarfile
 import time
 from threading import Thread
 
-from docker.models.containers import Container, ExecResult
-from password import Passwords
-import docker
-from language_map import language_map
-from scheduler import ShutdownManager
+from docker.models.containers import Container
 
-from config import *
+import docker
+from config import BASE_IMAGE, BASE_URL, INACTIVE_TIMELIMIT
+from language_map import language_map
+from password import Passwords
+from scheduler import ShutdownManager
+from viewer import viewer
 
 
 class MessageHandler:
@@ -46,6 +47,14 @@ class MessageHandler:
                 'app.name': 'everyone-runner',
                 'app.everyone-runner.user': user
             },
+        )
+        container.exec_run(
+            cmd=['chown', '1000:1000', '/workspace'],
+            user='0'
+        )
+        container.exec_run(
+            cmd=['mkdir', '-p', '/workspace/.code'],
+            user='1000',
         )
         return container
 
@@ -82,19 +91,13 @@ class MessageHandler:
             tarinfo.mode = 0o644
             tar.addfile(tarinfo, io.BytesIO(file_content.encode()))
         container.put_archive(
-            path='/workspace',
+            path='/workspace/.code',
             data=stream.getvalue(),
         )
 
-    def exec_in_container(self, container: Container, exec_args: dict, result_queue: queue.Queue):
-        exec_result = container.exec_run(**exec_args)
-        result_queue.put(exec_result)
-
-    def rtail_url_from_name(self, name: str) -> str:
-        return f'{RTAIL_WEBBASE}/#/streams/{name}'
-
-    def ttyd_url_from_name(self, name: str) -> str:
-        return TTYD_WEBBASE.format(user=name)
+    def exec_in_container(self, container: Container, exec_args: dict, run_id: str):
+        _, output = container.exec_run(stream=True, **exec_args)
+        return viewer.create_log_viewer(run_id, output)
 
     def run_language(self, user: str, language: str, code: str) -> tuple[int, str]:
         command = language_map.get(language)
@@ -102,54 +105,54 @@ class MessageHandler:
             return 10005, f'Language {language} not supported'
         container = self.get_running_user_container(user)
         self.shutdown_jm.extend_shutdown_job(user)
-        run_id = random_string(6)
-        filename_noext = f'.code-{user}-{run_id}'
+        rand_str = random_string(6)
+        datetime_str = time.strftime('%Y%m%d%H%M%S', time.localtime())
+        run_id = f'{datetime_str}-{user}-{rand_str}'
+        filename_noext = f'.code-{run_id}'
         filename = f'{filename_noext}.{language}'
         self.put_file(container, filename, code)
         run_command = command.format(
-            fileName=filename,
-            dir='/workspace/',
+            fileName='/workspace/.code/'+filename,
+            dir='/workspace/.code/',
             fileNameWithoutExt=filename_noext,
         )
-        datetime_str = time.strftime('%Y%m%d%H%M%S', time.localtime())
 
         exec_args = {
             "cmd": [
                 'timeout', '300',
                 'bash', '-c',
-                f'({run_command}) | rtail -h "{RTAIL_SERVER}" -p "{RTAIL_PORT}" --name "{datetime_str}-{run_id}-{user}" ; rm -f {filename}',
+                f'({run_command}) ; rm -f {filename}',
             ],
             "workdir": '/workspace',
             "user": '1000',
         }
-        q = queue.Queue()
-        t = Thread(target=self.exec_in_container,
-                   args=(container, exec_args, q))
-        t.start()
+        t = self.exec_in_container(container, exec_args, run_id)
+
         t.join(10)
         if t.is_alive():
-            return 0, '运行时间长，请在网站中查看结果：' + self.rtail_url_from_name(f'{datetime_str}-{run_id}-{user}')
+            return 0, '运行时间长，请在网站中查看结果：' + BASE_URL + '/log/' + run_id
         else:
-            output = q.get().output.decode()
+            _, output_list = viewer.get_log_viewer(run_id)
+            output = ''.join(output_list).strip()
             if len(output) == 0:
                 return 0, '<empty output>'
             if len(output) > 500:
-                return 0, '输出过长，请在网站中查看结果：' + self.rtail_url_from_name(f'{datetime_str}-{run_id}-{user}')
+                return 0, '输出过长，请在网站中查看结果：' + BASE_URL + '/log/' + run_id
             return 0, output
 
     def run_ttyd(self, user: str) -> tuple[int, str]:
         userinfo = self.passwords.get(user)
         if userinfo is None:
-            return 0, '请先设置密码' + self.ttyd_url_from_name('setpassword')
+            return 0, '请先设置密码' + BASE_URL + '/ttyd/setpassword/'
         container = self.get_running_user_container(user)
         self.shutdown_jm.extend_shutdown_job(user)
         if user in self.tty_running_users:
-            return 0, '请在网站中继续' + self.ttyd_url_from_name(user)
+            return 0, '请在网站中继续' + BASE_URL + '/ttyd/user/' + user
         password = userinfo['password']
         user_colon_password = f'{user}:{password}'
         container.exec_run(
             cmd=[
-                'ttyd', '-c', user_colon_password, 'bash'
+                'ttyd', '-b', f'/user/{user}', '-c', user_colon_password, 'bash'
             ],
             workdir='/workspace',
             user='1000',
@@ -174,6 +177,7 @@ class MessageHandler:
             return 0, 'gpg message not match'
         password = args[1]
         self.passwords.set(user, password)
+        return 0, '密码设置成功'
 
     def handle(self, user: str, user_input: str) -> tuple[int, str]:
         if not user_input.startswith('run '):

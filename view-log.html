@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:;" />
+    <style>
+      #logs {
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+      }
+    </style>
+    <title>Logs</title>
+  </head>
+  <body>
+    <pre id="logs"></pre>
+    <div id="unfinished" hidden>.</div>
+    <script defer>
+      const log_id = window.location.pathname.split("/").pop();
+      const log_url = "/api/v1/logs/" + log_id;
+      const logs = document.getElementById("logs");
+      const unfinished = document.getElementById("unfinished");
+
+      const dots_animation = setInterval(function () {
+        if (unfinished.innerText === "...") {
+          unfinished.innerText = "";
+        } else {
+          unfinished.innerText += ".";
+        }
+      }, 300);
+
+      (async function update(offset) {
+        const response = await fetch(log_url + "?offset=" + offset);
+        const data = await response.json();
+        const finished = data.finished;
+        const length = data.logs.length;
+        for (const log of data.logs) {
+          const log_element = document.createElement("div");
+          log_element.innerText = log;
+          logs.appendChild(log_element);
+        }
+        if (!finished) {
+          unfinished.hidden = false;
+          setTimeout(update, 1000, offset + length);
+        } else {
+          unfinished.hidden = true;
+          clearInterval(dots_animation);
+        }
+      })(0);
+    </script>
+  </body>
+</html>

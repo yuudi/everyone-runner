@@ -1,0 +1,13 @@
+:8080 {
+    reverse_proxy /ttyd/user/* everyone-runner-{http.request.uri.path.2}:7681
+    reverse_proxy * runner-admin:8000
+    handle_errors {
+        @error502 expression "{http.error.status_code} == 502"
+        handle @error502 {
+            respond "ttyd is not running"
+        }
+        handle {
+		    respond "{http.error.status_code} {http.error.status_text}"
+        }
+	}
+}

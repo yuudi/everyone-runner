@@ -7,4 +7,8 @@ docker run -dt \
     -w /workspace/runner-admin \
     -u 1000 \
     --entrypoint "" \
-    mcr.microsoft.com/devcontainers/universal:linux python main.py
+    --restart unless-stopped \
+    -e BASE_IMAGE="mcr.microsoft.com/devcontainers/universal:linux" \
+    -e BASE_URL="http://127.0.0.1:5000" \
+    -e API_SECRET="your-secret" \
+    mcr.microsoft.com/devcontainers/universal:linux /workspace/runner-admin/entry.sh

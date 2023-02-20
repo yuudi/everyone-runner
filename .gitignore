@@ -28,3 +28,7 @@ __pypackages__/
 
 # runtime
 data/
+logs/
+
+# gitkeep
+!/**/.gitkeep
