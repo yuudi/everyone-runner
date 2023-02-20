@@ -100,7 +100,7 @@ class MessageHandler:
         rand_str = random_string(6)
         datetime_str = time.strftime('%Y%m%d%H%M%S', time.localtime())
         run_id = f'{datetime_str}-{user}-{rand_str}'
-        filename_noext = f'.code-{run_id}'
+        filename_noext = f'code-{run_id}'
         filename = f'{filename_noext}.{language}'
         self.put_file(container, filename, code)
         run_command = command.format(
@@ -144,14 +144,14 @@ class MessageHandler:
         user_colon_password = f'{user}:{password}'
         container.exec_run(
             cmd=[
-                'ttyd', '-b', f'/user/{user}', '-c', user_colon_password, 'bash'
+                'ttyd', '-b', f'/ttyd/user/{user}', '-c', user_colon_password, 'bash'
             ],
             workdir='/workspace',
             user='1000',
             detach=True,
         )
         self.tty_running_users.add(user)
-        return 0, '请在网站中继续' + self.ttyd_url_from_name(user)
+        return 0, '请在网站中继续' + BASE_URL + '/ttyd/user/' + user
 
     def run_set_password(self, user: str, gpg_message: str) -> tuple[int, str]:
         process = subprocess.run(
