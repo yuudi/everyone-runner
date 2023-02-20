@@ -10,7 +10,7 @@ from threading import Thread
 from docker.models.containers import Container
 
 import docker
-from config import BASE_IMAGE, BASE_URL, INACTIVE_TIMELIMIT
+from config import BASE_URL, INACTIVE_TIMELIMIT
 from language_map import language_map
 from password import Passwords
 from scheduler import ShutdownManager
@@ -34,7 +34,7 @@ class MessageHandler:
 
     def create_user_container(self, user: str) -> Container:
         container = self.docker_client.containers.run(
-            image=BASE_IMAGE,
+            image="everyone-runner:universal",
             name=f'everyone-runner-{user}',
             user='1000',
             network='everyone-runner',
@@ -47,14 +47,6 @@ class MessageHandler:
                 'app.name': 'everyone-runner',
                 'app.everyone-runner.user': user
             },
-        )
-        container.exec_run(
-            cmd=['chown', '1000:1000', '/workspace'],
-            user='0'
-        )
-        container.exec_run(
-            cmd=['mkdir', '-p', '/workspace/.code'],
-            user='1000',
         )
         return container
 
