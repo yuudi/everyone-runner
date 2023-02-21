@@ -136,7 +136,7 @@ class MessageHandler:
     def run_ttyd(self, user: str) -> tuple[int, str]:
         userinfo = self.passwords.get(user)
         if userinfo is None:
-            return 0, '请先设置密码' + BASE_URL + '/ttyd/setpassword/'
+            return 0, '请先设置密码' + BASE_URL + '/ttyd/setpassword'
         container = self.get_running_user_container(user)
         self.shutdown_jm.extend_shutdown_job(user)
         if user in self.tty_running_users:

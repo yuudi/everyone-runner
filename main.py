@@ -49,7 +49,7 @@ def commands():
     return jsonify({'code': result, 'message': message}), 200
 
 
-@app.route('/ttyd/setpassword')
+@app.route('/ttyd/setpassword/')
 def setpassword():
     return send_file('setpassword.html')
 
