@@ -1,3 +1,4 @@
+from config import API_SECRET
 from flask import Flask, jsonify, request, send_file, send_from_directory
 
 from handler import MessageHandler
@@ -5,8 +6,6 @@ from viewer import (VIER_STATUS_FINISHED, VIER_STATUS_NOT_FOUND,
                     VIER_STATUS_RUNNING, viewer)
 
 app = Flask(__name__)
-
-from config import API_SECRET
 
 
 handler = MessageHandler()
@@ -49,7 +48,7 @@ def commands():
     return jsonify({'code': result, 'message': message}), 200
 
 
-@app.route('/ttyd/setpassword/')
+@app.route('/ttyd/setpassword', strict_slashes=False)
 def setpassword():
     return send_file('setpassword.html')
 

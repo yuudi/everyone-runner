@@ -10,7 +10,7 @@ from threading import Thread
 from docker.models.containers import Container
 
 import docker
-from config import BASE_URL, INACTIVE_TIMELIMIT
+from config import BASE_URL, INACTIVE_TIMELIMIT, VSCODE_URL_PATTERN
 from language_map import language_map
 from password import Passwords
 from scheduler import ShutdownManager
@@ -26,6 +26,7 @@ class MessageHandler:
             self.docker_client.networks.create('everyone-runner')
 
         self.tty_running_users = set()
+        self.vscode_running_users = set()
         self.passwords = Passwords()
         self.shutdown_jm = ShutdownManager(
             shutdown_func=self.shutdown_user_container,
@@ -154,6 +155,27 @@ class MessageHandler:
         self.tty_running_users.add(user)
         return 0, '请在网站中继续' + BASE_URL + '/ttyd/user/' + user
 
+    def run_vscode(self, user: str):
+        userinfo = self.passwords.get(user)
+        if userinfo is None:
+            return 0, '请先设置密码' + BASE_URL + '/ttyd/setpassword'
+        container = self.get_running_user_container(user)
+        self.shutdown_jm.extend_shutdown_job(user)
+        if user in self.vscode_running_users:
+            return 0, '请在网站中继续' + VSCODE_URL_PATTERN.format(user)
+        password = userinfo['password']
+        container.exec_run(
+            cmd=[
+                'code-server', '--bind-addr', '0.0.0.0:8080'
+            ],
+            environment={"PASSWORD": password},
+            workdir='/workspace',
+            user='1000',
+            detach=True,
+        )
+        self.vscode_running_users.add(user)
+        return 0, '请在网站中继续' + VSCODE_URL_PATTERN.format(user)
+
     def run_set_password(self, user: str, gpg_message: str) -> tuple[int, str]:
         process = subprocess.run(
             ['gpg', '--decrypt'],
@@ -179,6 +201,8 @@ class MessageHandler:
         if len(args) == 2:
             if args[1] == 'ttyd':
                 return self.run_ttyd(user)
+            if args[1] == 'vscode':
+                return self.run_vscode(user)
             else:
                 return 0, 'script needed'
         if len(args) != 3:

@@ -11,3 +11,16 @@
         }
 	}
 }
+
+:8081 {
+    reverse_proxy * everyone-runner-{http.request.host.labels.2}:8080
+    handle_errors {
+        @error502 expression "{http.error.status_code} == 502"
+        handle @error502 {
+            respond "ttyd is not running"
+        }
+        handle {
+		    respond "{http.error.status_code} {http.error.status_text}"
+        }
+	}
+}
