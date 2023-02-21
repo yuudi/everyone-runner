@@ -74,14 +74,15 @@ class MessageHandler:
 
     def put_file(self, container: Container, file_name: str, file_content: str):
         stream = io.BytesIO()
+        file_bytes = file_content.encode()
         with tarfile.open(fileobj=stream, mode='w') as tar:
             tarinfo = tarfile.TarInfo(file_name)
-            tarinfo.size = len(file_content)
+            tarinfo.size = len(file_bytes)
             tarinfo.mtime = time.time()
             tarinfo.uid = 1000
             tarinfo.gid = 1000
             tarinfo.mode = 0o644
-            tar.addfile(tarinfo, io.BytesIO(file_content.encode()))
+            tar.addfile(tarinfo, io.BytesIO(file_bytes))
         container.put_archive(
             path='/workspace/.code',
             data=stream.getvalue(),
