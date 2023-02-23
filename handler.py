@@ -61,6 +61,17 @@ class MessageHandler:
         else:
             container.stop()
         self.tty_running_users.discard(user)
+        self.vscode_running_users.discard(user)
+
+    def remove_user_container(self, user: str):
+        try:
+            container = self.docker_client.containers.get(
+                f'everyone-runner-{user}'
+            )
+        except docker.errors.NotFound:
+            pass
+        else:
+            container.remove(force=True)
 
     def get_running_user_container(self, user: str) -> Container:
         try:
@@ -162,7 +173,7 @@ class MessageHandler:
         container = self.get_running_user_container(user)
         self.shutdown_jm.extend_shutdown_job(user)
         if user in self.vscode_running_users:
-            return 0, '请在网站中继续' + VSCODE_URL_PATTERN.format(user)
+            return 0, '请在网站中继续' + VSCODE_URL_PATTERN.format(user=user)
         password = userinfo['password']
         container.exec_run(
             cmd=[
@@ -174,7 +185,21 @@ class MessageHandler:
             detach=True,
         )
         self.vscode_running_users.add(user)
-        return 0, '请在网站中继续' + VSCODE_URL_PATTERN.format(user)
+        return 0, '请在网站中继续' + VSCODE_URL_PATTERN.format(user=user)
+
+    def run_reset(self, user: str) -> tuple[int, str]:
+        self.shutdown_user_container(user)
+        self.tty_running_users.discard(user)
+        self.vscode_running_users.discard(user)
+        self.remove_user_container(user)
+        return 0, '重置成功'
+
+    def get_help_message(self) -> str:
+        return (
+            'run [language] [code]\n'
+            'run ttyd\n'
+            'run vscode\n'
+        )
 
     def run_set_password(self, user: str, gpg_message: str) -> tuple[int, str]:
         process = subprocess.run(
@@ -199,12 +224,17 @@ class MessageHandler:
             return 1, 'command not match'
         args = user_input.split(maxsplit=2)
         if len(args) == 2:
-            if args[1] == 'ttyd':
-                return self.run_ttyd(user)
-            if args[1] == 'vscode':
-                return self.run_vscode(user)
-            else:
-                return 0, 'script needed'
+            match args[1]:
+                case 'ttyd':
+                    return self.run_ttyd(user)
+                case 'vscode':
+                    return self.run_vscode(user)
+                case 'help':
+                    return 0, self.get_help_message()
+                case 'reset':
+                    return self.run_reset(user)
+                case _:
+                    return 0, 'script needed'
         if len(args) != 3:
             return 0, 'command not match'
         if args[1] == 'auth':
