@@ -196,9 +196,10 @@ class MessageHandler:
 
     def get_help_message(self) -> str:
         return (
-            'run [language] [code]\n'
-            'run ttyd\n'
-            'run vscode\n'
+            'run [language] [code] 执行代码\n'
+            'run ttyd 网页shell\n'
+            'run vscode 网页vscode\n'
+            'run reset 重置系统\n'
         )
 
     def run_set_password(self, user: str, gpg_message: str) -> tuple[int, str]:
@@ -225,11 +226,11 @@ class MessageHandler:
         args = user_input.split(maxsplit=2)
         if len(args) == 2:
             match args[1]:
-                case 'ttyd':
+                case 'ttyd' | 'shell':
                     return self.run_ttyd(user)
-                case 'vscode':
+                case 'vscode' | 'code':
                     return self.run_vscode(user)
-                case 'help':
+                case 'help' | '-h' | '--help' | '?' | 'usage' | '--usage':
                     return 0, self.get_help_message()
                 case 'reset':
                     return self.run_reset(user)
