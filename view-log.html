@@ -10,6 +10,12 @@
         overflow-wrap: break-word;
         white-space: pre-wrap;
       }
+      @media (prefers-color-scheme: dark) {
+        * {
+          background: #000000;
+          color: #c4c5c9;
+        }
+      }
     </style>
     <title>Logs</title>
   </head>
@@ -24,7 +30,7 @@
 
       const dots_animation = setInterval(function () {
         if (unfinished.innerText === "...") {
-          unfinished.innerText = "";
+          unfinished.innerText = ".";
         } else {
           unfinished.innerText += ".";
         }
