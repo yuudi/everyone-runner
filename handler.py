@@ -1,13 +1,12 @@
 import io
-import queue
 import random
 import string
 import subprocess
 import tarfile
 import time
-from threading import Thread
 
 from docker.models.containers import Container
+from docker.types import Ulimit
 
 import docker
 from config import BASE_URL, INACTIVE_TIMELIMIT, VSCODE_URL_PATTERN
@@ -44,6 +43,15 @@ class MessageHandler:
             command='sleep infinity',
             detach=True,
             auto_remove=False,
+            cpu_period=100000,
+            cpu_quota=100000,
+            mem_limit='512m',
+            storage_opt={
+                'size': '5G',
+            },
+            ulimits=[
+                Ulimit(name='nproc', hard=100, soft=100),
+            ],
             labels={
                 'app.name': 'everyone-runner',
                 'app.everyone-runner.user': user
