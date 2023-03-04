@@ -14,7 +14,7 @@ language_map = {
     "go": "go run {fileName}",
     "lua": "lua {fileName}",
     "groovy": "groovy {fileName}",
-    "powershell": "powershell -ExecutionPolicy ByPass -File {fileName}",
+    "powershell": "pwsh -ExecutionPolicy ByPass -File {fileName}",
     "bat": "cmd /c {fileName}",
     "sh": "sh {fileName}",
     "bash": "bash {fileName}",

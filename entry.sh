@@ -10,4 +10,4 @@ if [ ! -f data/public_key.asc ]; then
     gpg --export --armor "${USER:-localuser}@${HOSTNAME:-localhost}" > data/public_key.asc
 fi
 
-exec gunicorn -w 4 -b 0.0.0.0 main:app
+exec gunicorn -w 1 -b 0.0.0.0 main:app

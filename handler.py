@@ -40,18 +40,24 @@ class MessageHandler:
             network='everyone-runner',
             entrypoint='',
             working_dir='/workspace',
+            volumes={
+                f'everyone-runner-volume-workspace-{user}': {
+                    'bind': '/workspace',
+                    'mode': 'rw',
+                },
+            },
             command='sleep infinity',
             detach=True,
             auto_remove=False,
             cpu_period=100000,
             cpu_quota=100000,
             mem_limit='512m',
-            storage_opt={
-                'size': '5G',
-            },
-            ulimits=[
-                Ulimit(name='nproc', hard=100, soft=100),
-            ],
+            # storage_opt={
+            #     'size': '5G',
+            # },
+            # ulimits=[
+            #     Ulimit(name='nproc', hard=500, soft=500),
+            # ],
             labels={
                 'app.name': 'everyone-runner',
                 'app.everyone-runner.user': user
