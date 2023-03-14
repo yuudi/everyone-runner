@@ -118,7 +118,7 @@ class MessageHandler:
         _, output = container.exec_run(stream=True, **exec_args)
         return viewer.create_log_viewer(run_id, output)
 
-    def run_language(self, user: str, language: str, code: str) -> tuple[int, str]:
+    def run_language(self, user: str, language: str, code: str, cmd_override: list[str] = None) -> tuple[int, str]:
         command = language_map.get(language)
         if command is None:
             return 10005, f'Language {language} not supported'
@@ -135,13 +135,13 @@ class MessageHandler:
             dir='/workspace/.code/',
             fileNameWithoutExt=filename_noext,
         )
-
+        cmd = [
+            'timeout', '300',
+            'bash', '-c',
+            f'({run_command}) ; rm -f {filename}',
+        ] if cmd_override is None else cmd_override
         exec_args = {
-            "cmd": [
-                'timeout', '300',
-                'bash', '-c',
-                f'({run_command}) ; rm -f {filename}',
-            ],
+            "cmd": cmd,
             "workdir": '/workspace',
             "user": '1000',
         }
@@ -235,6 +235,15 @@ class MessageHandler:
         return 0, '密码设置成功'
 
     def handle(self, user: str, user_input: str) -> tuple[int, str]:
+        if user_input.startswith('run\n'):
+            args = user_input.split(maxsplit=1)
+            if len(args) == 1:
+                return 0, 'script needed'
+            return self.run_language(user, "bash", args[1], cmd_override=[
+                'timeout', '300',
+                'bash', '-c',
+                args[1],
+            ])
         if not user_input.startswith('run '):
             return 1, 'command not match'
         args = user_input.split(maxsplit=2)
